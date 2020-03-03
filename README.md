@@ -12,7 +12,7 @@ For subsequent moves players have 1 second each to extend their trees and decide
 # But better inside virtualenv...
 pip install numpy
 pip install matplotlib
-pip install mcst
+pip install mcts
 
 python quoridor.py
 ```
