@@ -605,7 +605,8 @@ class MCTSPlayer:
             node.update(result)
             node = node.parent
 
-def play_mcts_vs_mcts_game(game_num=1, simulations1=1000, simulations2=1000, max_turns=200, track_history=False):
+def play_mcts_vs_mcts_game(
+        game_num=1, simulations1=1000, simulations2=1000, max_turns=200, track_history=False, min_turn_time=0.0):
     """Play a game between two MCTS players"""
     state = QuorridorState()
     game = QuorridorGame()
@@ -640,6 +641,9 @@ def play_mcts_vs_mcts_game(game_num=1, simulations1=1000, simulations2=1000, max
 
         turn_time = time.time() - turn_start
         print(f"Move decided in {turn_time:.2f} seconds")
+
+        if turn_time < min_turn_time:
+            time.sleep(min_turn_time-turn_time)
 
         if action is None:
             print("No legal actions available! Game is a draw.")
@@ -982,7 +986,8 @@ if __name__ == "__main__":
         game_history = play_mcts_vs_mcts_game(
             game_num,
             simulations1=simulations_player1,
-            simulations2=simulations_player2
+            simulations2=simulations_player2,
+            min_turn_time=2
         )
     save_game_history(game_num, game_history)
     print("\n")
