@@ -33,7 +33,7 @@ class QuorridorState:
         # Vertical walls - True if wall exists at position (i, j)
         # Indexed as vertical_walls[row][column]
         # self.vertical_walls = np.array([[False for _ in range(9)] for _ in range(8)])
-        self.vertical_walls = [[False for _ in range(9)] for _ in range(8)]
+        self.vertical_walls = [[False for _ in range(9)] for _ in range(9)]
         # self.vertical_walls = np.zeros((8, 9), dtype=np.bool)
 
         # Current player (0 for White, 1 for Black)
@@ -298,15 +298,15 @@ class QuorridorGame:
         elif action_type == 'wall_h':
             col, row = action_data
             state.horizontal_walls[row][col] = True
-            if col < 8:
-                state.horizontal_walls[row][col+1] = True
-                state.remaining_walls[state.current_player] -= 1
+            # if col < 8:
+            state.horizontal_walls[row][col+1] = True
+            state.remaining_walls[state.current_player] -= 1
         elif action_type == 'wall_v':
             col, row = action_data
             state.vertical_walls[row][col] = True
-            if row < 7:
-                state.vertical_walls[row+1][col] = True
-                state.remaining_walls[state.current_player] -= 1
+            # if row < 7:
+            state.vertical_walls[row+1][col] = True
+            state.remaining_walls[state.current_player] -= 1
 
         # Record the action in history
         state.history.append((state.current_player, action))
@@ -315,60 +315,84 @@ class QuorridorGame:
         state.current_player = 1 - state.current_player
 
     def visualize_board(self, state, game_num, turn_num):
-        """Generate a string representation of the board"""
-        output = []
-        output.append(f"Game #{game_num}")
-        output.append("")
-        output.append(f"Turn {turn_num} ({['W', 'B'][state.current_player]}):")
+        """Generate a string representation of the board using NumPy arrays"""
+        # Create header lines as strings
+        header = [
+            f"Game #{game_num}",
+            "",
+            f"Turn {turn_num} ({['W', 'B'][state.current_player]}):",
+            "      A   B   C   D   E   F   G   H   I  "  # Added extra spaces for alignment
+        ]
 
-        # grid_char = '+'
-        grid_char = ' '
-        hw_char = '_'
+        # Initialize the board as a character array
+        # (2*9+1) rows: 9 cell rows + 9 horizontal wall rows + 1 bottom edge
+        # (4*9+1) columns: 9 cell columns + 9 vertical wall columns + 1 right edge
+        board = np.full((2 * 9 + 1, 4 * 9 + 1), ' ', dtype='U1')
 
-        # Add column headers
-        output.append("    A   B   C   D   E   F   G   H   I  ")
-        output.append(f"  {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char}")
+        # Add grid points - these may be overwritten by wall connectors
+        board[::2, ::4] = '+'
 
-        for row in range(9):
-            # Cell row
-            cell_row = f"{row + 1} |"
+        # Add top and bottom edges
+        board[0, 1:4 * 9:4] = '-'
+        board[0, 2:4 * 9:4] = '-'
+        board[0, 3:4 * 9:4] = '-'
+        board[-1, 1:4 * 9:4] = '-'
+        board[-1, 2:4 * 9:4] = '-'
+        board[-1, 3:4 * 9:4] = '-'
+
+        # Add left and right edges
+        board[1:2 * 9:2, 0] = '|'
+        board[1:2 * 9:2, -1] = '|'
+
+        # Add player positions
+        for player, symbol in enumerate(['W', 'B']):
+            if state.player_positions[player][1] < 9 and state.player_positions[player][0] < 9:
+                r, c = state.player_positions[player][1], state.player_positions[player][0]
+                board[r * 2 + 1, c * 4 + 2] = symbol
+
+        # Add horizontal walls
+        for row in range(1, 9):
             for col in range(9):
-                if state.player_positions[0] == (col, row):
-                    cell_row += " W "
-                elif state.player_positions[1] == (col, row):
-                    cell_row += " B "
+                if col <= 8 and state.horizontal_walls[row][col]:
+                    board[row * 2, col * 4 + 1:col * 4 + 4] = '-'
+                    # Check for consecutive horizontal walls to join them
+                    if col <= 7 and state.horizontal_walls[row][col + 1]:
+                        board[row * 2, (col + 1) * 4] = '-'  # Replace '+' with '-'
                 else:
-                    cell_row += "   "
+                    board[row * 2, col * 4 + 2] = '.'
 
-                # Vertical wall or space
-                if col < 8:
-                    # Fixed the index error by checking if there's a vertical wall at position col
-                    if col < 8 and row < 8 and state.vertical_walls[row][col + 1]:
-                        cell_row += "|"
-                    else:
-                        cell_row += "."
-            cell_row += "|"
-            output.append(cell_row)
+        # Add vertical walls
+        for row in range(9):
+            for col in range(1, 9):
+                vis_row = row * 2 + 1
+                vis_col = col * 4
+                if col < 9 and state.vertical_walls[row][col]:
+                    board[vis_row, vis_col] = '|'
+                    # Check for consecutive vertical walls to join them
+                    if row < 7 and state.vertical_walls[row + 1][col]:
+                        vis_next_row = (row + 1) * 2
+                        if board[vis_next_row, vis_col] == '+':
+                            board[vis_next_row, vis_col] = '|'  # Replace '+' with '|'
+                        else:
+                            board[vis_next_row, vis_col] = '#'  # Replace '-' with '#'
+                else:
+                    board[vis_row, vis_col] = '.'
 
-            # Horizontal wall row
-            if row < 8:
-                wall_row = f"  {grid_char}"
-                for col in range(9):
-                    # Wall or space
-                    if row + 1 < 9 and state.horizontal_walls[row][col]:
-                        wall_row += f" {hw_char} "
-                    else:
-                        wall_row += " . "
+        # Convert board to string rows
+        board_lines = []
+        for i in range(board.shape[0]):
+            if i % 2 == 1:  # Player rows
+                # Add row number with 2 characters of space
+                line = f"{i // 2 + 1:2d}  {''.join(board[i])}"
+            else:  # Wall rows or top/bottom edges
+                # Add 4 spaces to align with the row numbers
+                line = f"    {''.join(board[i])}"
+            board_lines.append(line)
 
-                    # Intersection
-                    wall_row += grid_char
-                output.append(wall_row)
+        # Combine header and board
+        output = header + board_lines
 
-        # Bottom edge
-        output.append(
-            f"  {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char} - {grid_char}")
-
-        return "\n".join(output)
+        return '\n'.join(output)
 
 
 def play_random_game(game_num=1, max_turns=200):
@@ -581,7 +605,8 @@ class MCTSPlayer:
             node.update(result)
             node = node.parent
 
-def play_mcts_vs_mcts_game(game_num=1, simulations1=1000, simulations2=1000, max_turns=200, track_history=False):
+def play_mcts_vs_mcts_game(
+        game_num=1, simulations1=1000, simulations2=1000, max_turns=200, track_history=False, min_turn_time=0.0):
     """Play a game between two MCTS players"""
     state = QuorridorState()
     game = QuorridorGame()
@@ -616,6 +641,9 @@ def play_mcts_vs_mcts_game(game_num=1, simulations1=1000, simulations2=1000, max
 
         turn_time = time.time() - turn_start
         print(f"Move decided in {turn_time:.2f} seconds")
+
+        if turn_time < min_turn_time:
+            time.sleep(min_turn_time-turn_time)
 
         if action is None:
             print("No legal actions available! Game is a draw.")
@@ -947,8 +975,8 @@ if __name__ == "__main__":
     np.random.seed(42)
 
     # Number of simulations for each player
-    simulations_player1 = 35  # White
-    simulations_player2 = 30  # Black
+    simulations_player1 = 50  # White
+    simulations_player2 = 50  # Black
 
     for game_num in range(1, num_games + 1):
         print(f"\n===== GAME {game_num} =====\n")
@@ -958,7 +986,8 @@ if __name__ == "__main__":
         game_history = play_mcts_vs_mcts_game(
             game_num,
             simulations1=simulations_player1,
-            simulations2=simulations_player2
+            simulations2=simulations_player2,
+            min_turn_time=2
         )
     save_game_history(game_num, game_history)
     print("\n")
