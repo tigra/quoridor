@@ -1,4 +1,8 @@
-# A simplified version of Quoridor game AI self-play using Monte Carlo Tree Search
+# Quoridor game AI self-play using Monte Carlo Tree Search
+
+[Quoridor](https://en.wikipedia.org/wiki/Quoridor) game is played on 9x9 board. Players have 1 pawn each placed in the middles of boards sides. 2-player version is supported now (4-player - not yet).
+On each turn, players can move their pawns, or place the walls between cells. Each wall is 2 cells long. Each player has 10 walls. In case opponent's pawn is blocking the way, player can jump over it.
+The goal of the game is to reach the opposite side of the board with one's pawn. Completely blocking the path to victory for any pawn with walls is prohibited.
 
 ## New version vibecoded together with Claude
 
