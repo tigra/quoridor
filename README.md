@@ -1,4 +1,8 @@
-# A simplified version of Quoridor game AI self-play using Monte Carlo Tree Search
+# Quoridor game AI self-play using Monte Carlo Tree Search
+
+[Quoridor](https://en.wikipedia.org/wiki/Quoridor) game is played on 9x9 board. Players have 1 pawn each placed in the middles of boards sides. 2-player version is supported now (4-player - not yet).
+On each turn, players can move their pawns, or place the walls between cells. Each wall is 2 cells long. Each player has 10 walls. In case opponent's pawn is blocking the way, player can jump over it.
+The goal of the game is to reach the opposite side of the board with one's pawn. Completely blocking the path to victory for any pawn with walls is prohibited.
 
 ## New version vibecoded together with Claude
 
@@ -16,12 +20,14 @@ procedure.
 
 ### Known issues
 
-* Sometimes hangs during thinking through the step
-* Sometimes tries to place the wall in nonsensical place (ignored during turn execution)
+* Sometimes tries to place the wall in nonsensical place (ignored during turn execution) - seems fixed, but will keep an eye
+* Sometimes blocks someone's pawn completely
+* Sometimes allows jumping over the wall (probably connected with previous issue)
+* Need to check if all allowed jumpover situations are supported
 * NN implementation does not invert the player/board, so play is nonsensical for second player
 * Requires refactoring and further testing
 * Would be great to use Numpy more
-* Would be great to reuse the MCTS tree from previous step and build on that
+* Would be great to parallelize simulations to have players think faster
 
 ## Older version
 (Very) simplified :)
