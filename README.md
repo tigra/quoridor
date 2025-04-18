@@ -16,7 +16,9 @@ procedure.
 
 ### Known issues
 
-* Sometimes tries to place the wall in nonsensical place (ignored during turn execution)
+* Sometimes blocks someone's pawn completely
+* Sometimes allows jumping over the wall (probably connected with previous issue)
+* Need to check if all allowed jumpover situations are supported
 * NN implementation does not invert the player/board, so play is nonsensical for second player
 * Requires refactoring and further testing
 * Would be great to use Numpy more
