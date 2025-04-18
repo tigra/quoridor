@@ -20,14 +20,10 @@ procedure.
 
 ### Known issues
 
-* Sometimes tries to place the wall in nonsensical place (ignored during turn execution) - seems fixed, but will keep an eye
-* Sometimes blocks someone's pawn completely
-* Sometimes allows jumping over the wall (probably connected with previous issue)
-* Need to check if all allowed jumpover situations are supported
+* Sometimes tries to place the wall in nonsensical place (ignored during turn execution)
 * NN implementation does not invert the player/board, so play is nonsensical for second player
 * Requires refactoring and further testing
 * Would be great to use Numpy more
-* Would be great to parallelize simulations to have players think faster
 
 ## Older version
 (Very) simplified :)
