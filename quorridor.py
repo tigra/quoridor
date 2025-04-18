@@ -4,6 +4,7 @@ import time
 import os
 import copy
 from collections import deque
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import tqdm
@@ -533,12 +534,13 @@ class MCTSNode:
 
 
 class MCTSPlayer:
-    def __init__(self, game, exploration_weight=1.41, simulations=100, player_id=None):
+    def __init__(self, game, exploration_weight=1.41, simulations=100, player_id=None, parallel_simulations=1):
         self.game = game
         self.exploration_weight = exploration_weight
         self.simulations = simulations
         self.player_id = player_id  # For logging purposes
         self.root = None
+        self.parallel_simulations = parallel_simulations
 
     def get_action(self, state):
         """Get the best action using MCTS"""
@@ -553,8 +555,8 @@ class MCTSPlayer:
                 self.root = child  # reuse subtree
 
         # Perform MCTS simulations
-        if len(state.history) < 14:
-            simulations = self.simulations * 4
+        if len(state.history) < 2:
+            simulations = self.simulations * 2
         else:
             simulations = self.simulations
         for i in tqdm.tqdm(range(simulations)):
@@ -563,18 +565,24 @@ class MCTSPlayer:
 
             # 2. Expansion: If leaf is not terminal and has untried actions, expand it
             if not leaf.state.is_game_over() and (leaf.untried_actions is None or len(leaf.untried_actions) > 0):
-                expanded_node = self._expand(leaf)
+                expanded_nodes = self._expand_nodes(leaf, self.parallel_simulations)
+                # expanded_node = self._expand(leaf)
 
                 # 3. Simulation: Run a random simulation from the expanded node
-                result = self._simulate(expanded_node.state)
+                # result = self._simulate(expanded_node.state)
+                # results = [self._simulate(expanded_node.state) if expanded_node is not None else None for expanded_node in expanded_nodes]
+                with ProcessPoolExecutor(max_workers=10) as executor:
+                    results = executor.map(simulate, [self.game] * len(expanded_nodes), [expanded_node.state for expanded_node in expanded_nodes])
 
                 # 4. Backpropagation: Update statistics up the tree
-                self._backpropagate(expanded_node, result)
+                for expanded_node, result in zip(expanded_nodes, results):
+                    if expanded_node is not None:
+                        self._backpropagate(expanded_node, result)
             else:
                 # If leaf is terminal or fully expanded, backpropagate from leaf
                 result = leaf.state.get_winner()
                 if result is None:  # If game isn't over, simulate
-                    result = self._simulate(leaf.state)
+                    result = simulate(self.game, leaf.state)
                 self._backpropagate(leaf, result)
 
         # Choose the best child based on visit count (most robust)
@@ -602,39 +610,52 @@ class MCTSPlayer:
             node.untried_actions = self.game.get_legal_actions(node.state)
 
         # Choose a random untried action
-        action = node.untried_actions.pop(random.randrange(len(node.untried_actions)))
+        n_untried = len(node.untried_actions)
+        if n_untried > 0:
+            action = node.untried_actions.pop(random.randrange(n_untried))
 
-        # Create a new state by applying the action
-        new_state = node.state.clone()
-        self.game.apply_action(new_state, action)
+            # Create a new state by applying the action
+            new_state = node.state.clone()
+            self.game.apply_action(new_state, action)
 
-        # Add a child node and return it
-        return node.add_child(new_state, action)
-
-    def _simulate(self, state):
-        """Simulate a random game from the given state"""
-        state = state.clone()
-
-        while not state.is_game_over() and len(state.history) < 200:
-            # Get legal actions
-            actions = self.game.get_legal_actions(state)
-
-            # Choose a random action
-            if not actions:
-                break  # No legal moves, draw
-            action = random.choice(actions)
-
-            # Apply the action
-            self.game.apply_action(state, action)
-
-        # Return the winner (or None for draw)
-        return state.get_winner()
+            # Add a child node and return it
+            return node.add_child(new_state, action)
+        else:
+            return None
 
     def _backpropagate(self, node, result):
         """Backpropagate the result up the tree"""
         while node is not None:
             node.update(result)
             node = node.parent
+
+    def _expand_nodes(self, leaf, new_node_count):
+        nodes = []
+        for _ in range(new_node_count):
+            new_node = self._expand(leaf)
+            if new_node is not None:
+                nodes.append(new_node)
+        return nodes
+
+def simulate(game, state):
+    """Simulate a random game from the given state"""
+    state = state.clone()
+
+    while not state.is_game_over() and len(state.history) < 200:
+        # Get legal actions
+        actions = game.get_legal_actions(state)
+
+        # Choose a random action
+        if not actions:
+            break  # No legal moves, draw
+        action = random.choice(actions)
+
+        # Apply the action
+        game.apply_action(state, action)
+
+    # Return the winner (or None for draw)
+    return state.get_winner()
+
 
 def play_mcts_vs_mcts_game(
         game_num=1, simulations1=1000, simulations2=1000, max_turns=200, track_history=False, min_turn_time=0.0):
@@ -643,8 +664,8 @@ def play_mcts_vs_mcts_game(
     game = QuorridorGame()
 
     # Create MCTS players
-    player1 = MCTSPlayer(game, simulations=simulations1, player_id="White")
-    player2 = MCTSPlayer(game, simulations=simulations2, player_id="Black")
+    player1 = MCTSPlayer(game, simulations=simulations1, player_id="White", parallel_simulations=10)
+    player2 = MCTSPlayer(game, simulations=simulations2, player_id="Black", parallel_simulations=5)
 
     players = [player1, player2]
     game_history = []
@@ -1004,12 +1025,12 @@ if __name__ == "__main__":
     num_games = 1
 
     seed = 46
-    np.random.seed(seed)
-    random.seed(seed)
+    # np.random.seed(seed)
+    # random.seed(seed)
 
     # Number of simulations for each player
-    simulations_player1 = 100  # White
-    simulations_player2 = 105  # Black
+    simulations_player1 = 70  # White
+    simulations_player2 = 70  # Black
 
     for game_num in range(1, num_games + 1):
         print(f"\n===== GAME {game_num} =====\n")
