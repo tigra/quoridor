@@ -69,6 +69,13 @@ class QuorridorState:
         """Check if the game is over"""
         return self.get_winner() is not None
 
+    def __eq__(self, other):
+        if  (self.current_player != other.current_player or self.player_positions != other.player_positions or
+            self.remaining_walls != other.remaining_walls or self.horizontal_walls != other.horizontal_walls or
+            self.vertical_walls != other.vertical_walls):
+            return False
+        return True
+
 
 class QuorridorGame:
     def __init__(self):
@@ -513,6 +520,17 @@ class MCTSNode:
         exploration = exploration_weight * math.sqrt(math.log(self.parent.visits) / self.visits)
         return exploitation + exploration
 
+    def find_child(self, state, depth):
+        if self.state == state:
+            return self
+        if depth < 1:
+            return None
+        for child in self.children:
+            node = child.find_child(state, depth-1)
+            if node is not None:
+                return None
+        return None
+
 
 class MCTSPlayer:
     def __init__(self, game, exploration_weight=1.41, simulations=100, player_id=None):
@@ -520,15 +538,24 @@ class MCTSPlayer:
         self.exploration_weight = exploration_weight
         self.simulations = simulations
         self.player_id = player_id  # For logging purposes
+        self.root = None
 
     def get_action(self, state):
         """Get the best action using MCTS"""
-        root = MCTSNode(state.clone())
+        if self.root is None:
+            self.root = MCTSNode(state.clone())
+        else:
+            child = self.root.find_child(state, 2)
+            if child is None:
+                self.root = MCTSNode(state.clone())
+            else:
+                print("Find child!")
+                self.root = child
 
         # Perform MCTS simulations
-        for _ in tqdm.tqdm(range(self.simulations)):
+        for i in tqdm.tqdm(range(self.simulations)):
             # 1. Selection: Find the most promising leaf node
-            leaf = self._select(root)
+            leaf = self._select(self.root)
 
             # 2. Expansion: If leaf is not terminal and has untried actions, expand it
             if not leaf.state.is_game_over() and (leaf.untried_actions is None or len(leaf.untried_actions) > 0):
@@ -547,10 +574,10 @@ class MCTSPlayer:
                 self._backpropagate(leaf, result)
 
         # Choose the best child based on visit count (most robust)
-        if not root.children:
+        if not self.root.children:
             return None
 
-        best_child = max(root.children, key=lambda c: c.visits)
+        best_child = max(self.root.children, key=lambda c: c.visits)
         return best_child.action
 
     def _select(self, node):
@@ -584,7 +611,7 @@ class MCTSPlayer:
         """Simulate a random game from the given state"""
         state = state.clone()
 
-        while not state.is_game_over():
+        while not state.is_game_over() and len(state.history) < 200:
             # Get legal actions
             actions = self.game.get_legal_actions(state)
 
@@ -972,11 +999,13 @@ if __name__ == "__main__":
     # Play MCTS vs MCTS games
     num_games = 1
 
-    np.random.seed(42)
+    seed = 43
+    np.random.seed(seed)
+    random.seed(seed)
 
     # Number of simulations for each player
     simulations_player1 = 50  # White
-    simulations_player2 = 50  # Black
+    simulations_player2 = 70  # Black
 
     for game_num in range(1, num_games + 1):
         print(f"\n===== GAME {game_num} =====\n")
