@@ -528,7 +528,7 @@ class MCTSNode:
         for child in self.children:
             node = child.find_child(state, depth-1)
             if node is not None:
-                return None
+                return node
         return None
 
 
@@ -549,11 +549,15 @@ class MCTSPlayer:
             if child is None:
                 self.root = MCTSNode(state.clone())
             else:
-                print("Find child!")
-                self.root = child
+                print("Found a child!")
+                self.root = child  # reuse subtree
 
         # Perform MCTS simulations
-        for i in tqdm.tqdm(range(self.simulations)):
+        if len(state.history) < 14:
+            simulations = self.simulations * 4
+        else:
+            simulations = self.simulations
+        for i in tqdm.tqdm(range(simulations)):
             # 1. Selection: Find the most promising leaf node
             leaf = self._select(self.root)
 
@@ -999,13 +1003,13 @@ if __name__ == "__main__":
     # Play MCTS vs MCTS games
     num_games = 1
 
-    seed = 43
+    seed = 46
     np.random.seed(seed)
     random.seed(seed)
 
     # Number of simulations for each player
-    simulations_player1 = 50  # White
-    simulations_player2 = 70  # Black
+    simulations_player1 = 100  # White
+    simulations_player2 = 105  # Black
 
     for game_num in range(1, num_games + 1):
         print(f"\n===== GAME {game_num} =====\n")
